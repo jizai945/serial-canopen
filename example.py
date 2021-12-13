@@ -1,9 +1,9 @@
 import types
-
 import canopen
 import time
 import serial
 import struct
+import traceback
 from can import Message
 
 def listen_cb(msg):
@@ -50,10 +50,10 @@ def my_recv_internal(self, timeout):
             data = self.ser.read(8)
             dlc = ord(self.ser.read())
             rxd_byte = self.ser.read(2)
-            timestamp = 0
+            timestamp = time.time()
             if rxd_byte and rxd_byte[0] == 0xA8 and rxd_byte[1] == 0xA7:
                 # received message data okay
-                msg = Message(timestamp=timestamp / 1000,
+                msg = Message(timestamp=timestamp,
                               arbitration_id=arb_id,
                               dlc=8,
                               data=data)
@@ -65,28 +65,36 @@ def my_recv_internal(self, timeout):
         return None, False
 
 
-# Start with creating a network representing one CAN bus
-network = canopen.Network()
+if __name__ == '__main__':
+    COM_PORT = 'COM6'
 
-# Add some nodes with corresponding Object Dictionaries
-node = canopen.RemoteNode(6, './CANopenSocket.eds')
-network.add_node(node)
-node2 = canopen.RemoteNode(7, './e35.eds')
-network.add_node(node2)
+    try:
+        # Start with creating a network representing one CAN bus
+        network = canopen.Network()
 
-# Add some nodes with corresponding Object Dictionaries
-network.connect(bustype="serial",  channel='COM6')
-network.bus.send = types.MethodType(my_serial_send, network.bus)  # 重构发送方法
-network.bus._recv_internal = types.MethodType(my_recv_internal, network.bus)  # 重构接收方法
+        # Add some nodes with corresponding Object Dictionaries
+        node = canopen.RemoteNode(6, './CANopenSocket.eds')
+        network.add_node(node)
+        node2 = canopen.RemoteNode(7, './e35.eds')
+        network.add_node(node2)
 
-network.listeners.append(listen_cb)                 # 添加一个监听回调函数
+        # Add some nodes with corresponding Object Dictionaries
+        network.connect(bustype="serial",  channel=COM_PORT)
+        network.bus.send = types.MethodType(my_serial_send, network.bus)  # 重构发送方法
+        network.bus._recv_internal = types.MethodType(my_recv_internal, network.bus)  # 重构接收方法
 
-# send test message
-network.send_message(0x06, bytes([0x11, 0x22]))
+        network.listeners.append(listen_cb)                 # 添加一个监听回调函数
 
-print('-'*30)
-time.sleep(0.5)
+        # send test message
+        network.send_message(0x06, bytes([0x11, 0x22]))
 
-network.sync.stop()
-network.disconnect()
+        print('-'*30)
+        time.sleep(3)
+
+        network.sync.stop()
+        network.disconnect()
+    except Exception as e:
+        print(traceback.format_exc())
+        print('can err')
+
 
