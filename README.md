@@ -1,0 +1,2 @@
+# serial-canopen
+基于python官方canopen协议，在can数据上封装了一层自定义的usb串口协议
